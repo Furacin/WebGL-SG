@@ -12,6 +12,10 @@ function Esfera(radio,latBands,longBands) {
   this.normalArray=[];
   this.facesArray=[];
   this.textureArray=[];
+  this.vertex_and_texture=[];
+  this.texturePath=false;
+  this.webglTexture=false;
+  this.imagen=false;
 
   //Construir cada uno de estos elementos
   // 1.- Vector de normales
@@ -42,6 +46,13 @@ function Esfera(radio,latBands,longBands) {
       this.vertexArray.push(this.radio*x);
       this.vertexArray.push(this.radio*y);
       this.vertexArray.push(this.radio*z);
+
+      //Vertex y texture juntos
+      this.vertex_and_texture.push(this.radio*x);
+      this.vertex_and_texture.push(this.radio*y);
+      this.vertex_and_texture.push(this.radio*z);
+      this.vertex_and_texture.push(u);
+      this.vertex_and_texture.push(v);
     }
   }
 
@@ -68,12 +79,37 @@ Esfera.prototype={
     return number;
   },
   traslate: function(x,y,z) {
-    //Debemos de trasladar primero la normal, y luego la posicion.
+    //Debemos de trasladar la posicion y luego reconstruir el vector
+    //conjunto de texturas y arrays
+    var posTexture=0;
+    this.vertex_and_texture.length=0;
     for(var i=0;i<this.normalArray.length;i+=3) {
       this.vertexArray[i]=(this.normalArray[i]*this.radio)+x;
       this.vertexArray[i+1]=(this.normalArray[i+1]*this.radio)+y;
       this.vertexArray[i+2]=(this.normalArray[i+2]*this.radio)+z;
+      this.vertex_and_texture.push(this.vertexArray[i]);
+      this.vertex_and_texture.push(this.vertexArray[i+1]);
+      this.vertex_and_texture.push(this.vertexArray[i+2]);
+      this.vertex_and_texture.push(this.textureArray[posTexture++]);
+      this.vertex_and_texture.push(this.textureArray[posTexture++]);
     }
+  },
+  loadTexture: function(texturePath,GL) {
+    this.texturePath=texturePath;
+
+    this.imagen=new Image();
+    this.imagen.onload=function(e) {
+      this.webglTexture=GL.createTexture();
+      GL.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL,true);
+
+      GL.bindTexture(GL.TEXTURE_2D,this.webglTexture); //Preparamos para asociar textura
+      GL.texImage2D(GL.TEXTURE_2D,0,GL.RGBA,GL.RGBA,GL.UNSIGNED_BYTE,this.imagen);
+      GL.texParameteri(GL.TEXTURE_2D,GL.TEXTURE_MAG_FILTER,GL.LINEAR);
+      GL.texParameteri(GL.TEXTURE_2D,GL.TEXTURE_MIN_FILTER,GL.LINEAR);
+
+      GL.bindTexture(GL.TEXTURE_2D,null); //Liberar recursos
+    }
+    this.imagen.src=this.texturePath;
   }
 };
 
