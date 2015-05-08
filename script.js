@@ -4,12 +4,45 @@ var main=function() {
   CANVAS.width=window.innerWidth;
   CANVAS.height=window.innerHeight;
 
+  /*========================= CAPTURE MOUSE EVENTS ========================= */
+
+  var AMORTIZATION=0.95;
+  var drag=false;
+  var old_x, old_y;
+  var dX=0, dY=0;
+
+  var mouseDown=function(e) {
+    drag=true;
+    old_x=e.pageX, old_y=e.pageY;
+    e.preventDefault();
+    return false;
+  };
+
+  var mouseUp=function(e){
+    drag=false;
+  };
+
+  var mouseMove=function(e) {
+    if (!drag) return false;
+    dX=(e.pageX-old_x)*Math.PI/CANVAS.width,
+      dY=(e.pageY-old_y)*Math.PI/CANVAS.height;
+    THETA+=dX;
+    PHI+=dY;
+    old_x=e.pageX, old_y=e.pageY;
+    e.preventDefault();
+  };
+
+  CANVAS.addEventListener("mousedown", mouseDown, false);
+  CANVAS.addEventListener("mouseup", mouseUp, false);
+  CANVAS.addEventListener("mouseout", mouseUp, false);
+  CANVAS.addEventListener("mousemove", mouseMove, false);
+
   /*========================= GET WEBGL CONTEXT ========================= */
   var GL;
   try {
     GL = CANVAS.getContext("experimental-webgl", {antialias: true});
   } catch (e) {
-    alert("You are not webgl compatible :(") ;
+    alert("You are not webgl compatible :(") ;
     return false;
   }
 
@@ -21,18 +54,21 @@ attribute vec3 position;\n\
 uniform mat4 Pmatrix;\n\
 uniform mat4 Vmatrix;\n\
 uniform mat4 Mmatrix;\n\
-attribute vec3 color; //the color of the point\n\
-varying vec3 vColor;\n\
+attribute vec2 uv;\n\
+varying vec2 vUV;\n\
 void main(void) { //pre-built function\n\
 gl_Position = Pmatrix*Vmatrix*Mmatrix*vec4(position, 1.);\n\
-vColor=color;\n\
+vUV=uv;\n\
 }";
 
   var shader_fragment_source="\n\
 precision mediump float;\n\
-varying vec3 vColor;\n\
+uniform sampler2D sampler;\n\
+varying vec2 vUV;\n\
+\n\
+\n\
 void main(void) {\n\
-gl_FragColor = vec4(vColor, 1.);\n\
+gl_FragColor = texture2D(sampler, vUV);\n\
 }";
 
   var get_shader=function(source, type, typeString) {
@@ -59,45 +95,48 @@ gl_FragColor = vec4(vColor, 1.);\n\
   var _Vmatrix = GL.getUniformLocation(SHADER_PROGRAM, "Vmatrix");
   var _Mmatrix = GL.getUniformLocation(SHADER_PROGRAM, "Mmatrix");
 
-  var _color = GL.getAttribLocation(SHADER_PROGRAM, "color");
+  var _sampler = GL.getUniformLocation(SHADER_PROGRAM, "sampler");
+  var _uv = GL.getAttribLocation(SHADER_PROGRAM, "uv");
   var _position = GL.getAttribLocation(SHADER_PROGRAM, "position");
 
-  GL.enableVertexAttribArray(_color);
+  GL.enableVertexAttribArray(_uv);
   GL.enableVertexAttribArray(_position);
 
   GL.useProgram(SHADER_PROGRAM);
+  //GL.uniform1i(_sampler, 0);
 
-  /*========================= THE CUBE ========================= */
+  /*========================= Esfera original ========================= */
   var luna=new Esfera(1/4,60,60);
   var tierra=new Esfera(1,60,60);
 
-  //Prueba de traslate
-  luna.traslate(-1-tierra.radio,0,0);
-
+  luna.traslate(2,0,0);
+  /*========================= THE CUBE ========================= */
+  //POINTS :
   var LUNA_VERTEX= GL.createBuffer ();
+  var TIERRA_VERTEX=GL.createBuffer();
+
   GL.bindBuffer(GL.ARRAY_BUFFER, LUNA_VERTEX);
   GL.bufferData(GL.ARRAY_BUFFER,
-                new Float32Array(luna.vertexArray),
-    GL.STATIC_DRAW);
+                new Float32Array(luna.vertex_and_texture),
+    GL.DYNAMIC_DRAW);
 
+  GL.bindBuffer(GL.ARRAY_BUFFER,TIERRA_VERTEX);
+  GL.bufferData(GL.ARRAY_BUFFER,
+    new Float32Array(tierra.vertex_and_texture),
+    GL.DYNAMIC_DRAW);
+
+  //FACES :
   var LUNA_FACES= GL.createBuffer ();
+  var TIERRA_FACES=GL.createBuffer();
   GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, LUNA_FACES);
   GL.bufferData(GL.ELEMENT_ARRAY_BUFFER,
                 new Uint16Array(luna.facesArray),
     GL.STATIC_DRAW);
 
-  var TIERRA_VERTEX= GL.createBuffer ();
-  GL.bindBuffer(GL.ARRAY_BUFFER, TIERRA_VERTEX);
-  GL.bufferData(GL.ARRAY_BUFFER,
-                  new Float32Array(tierra.vertexArray),
-    GL.STATIC_DRAW);
-
-  var TIERRA_FACES= GL.createBuffer ();
-  GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, TIERRA_FACES);
+  GL.bindBuffer(GL.ARRAY_BUFFER,TIERRA_FACES);
   GL.bufferData(GL.ELEMENT_ARRAY_BUFFER,
-                  new Uint16Array(tierra.facesArray),
+    new Uint16Array(tierra.facesArray),
     GL.STATIC_DRAW);
-
 
   /*========================= MATRIX ========================= */
 
@@ -106,6 +145,49 @@ gl_FragColor = vec4(vColor, 1.);\n\
   var VIEWMATRIX=LIBS.get_I4();
 
   LIBS.translateZ(VIEWMATRIX, -6);
+  var THETA=0,
+      PHI=0;
+
+  /*========================= TEXTURES ========================= */
+  var get_texture=function(image_URL){
+
+
+    var image=new Image();
+
+    image.src=image_URL;
+    image.webglTexture=false;
+
+
+    image.onload=function(e) {
+
+
+
+      var texture=GL.createTexture();
+
+      GL.pixelStorei(GL.UNPACK_FLIP_Y_WEBGL, true);
+
+
+      GL.bindTexture(GL.TEXTURE_2D, texture);
+
+      GL.texImage2D(GL.TEXTURE_2D, 0, GL.RGBA, GL.RGBA, GL.UNSIGNED_BYTE, image);
+
+      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, GL.LINEAR);
+
+      GL.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, GL.NEAREST_MIPMAP_LINEAR);
+
+      GL.generateMipmap(GL.TEXTURE_2D);
+
+      GL.bindTexture(GL.TEXTURE_2D, null);
+
+      image.webglTexture=texture;
+    };
+
+    return image;
+  };
+
+  var luna_texture=get_texture("textures/luna.png");
+  var tierra_texture=get_texture("textures/earth.png");
+
 
   /*========================= DRAWING ========================= */
   GL.enable(GL.DEPTH_TEST);
@@ -116,9 +198,13 @@ gl_FragColor = vec4(vColor, 1.);\n\
   var time_old=0;
   var animate=function(time) {
     var dt=time-time_old;
-//    LIBS.rotateZ(MOVEMATRIX, dt*0.001);
-    LIBS.rotateY(MOVEMATRIX, dt*0.002);
-//    LIBS.rotateX(MOVEMATRIX, dt*0.003);
+    if (!drag) {
+      dX*=AMORTIZATION, dY*=AMORTIZATION;
+      THETA+=dX, PHI+=dY;
+    }
+    LIBS.set_I4(MOVEMATRIX);
+    LIBS.rotateY(MOVEMATRIX, THETA);
+    LIBS.rotateX(MOVEMATRIX, PHI);
     time_old=time;
 
     GL.viewport(0.0, 0.0, CANVAS.width, CANVAS.height);
@@ -126,23 +212,40 @@ gl_FragColor = vec4(vColor, 1.);\n\
     GL.uniformMatrix4fv(_Pmatrix, false, PROJMATRIX);
     GL.uniformMatrix4fv(_Vmatrix, false, VIEWMATRIX);
     GL.uniformMatrix4fv(_Mmatrix, false, MOVEMATRIX);
+    if (luna_texture.webglTexture) {
+
+      GL.activeTexture(GL.TEXTURE0);
+
+      GL.bindTexture(GL.TEXTURE_2D, luna_texture.webglTexture);
+      GL.uniform1i(_sampler, 0);
+
+    }
     GL.bindBuffer(GL.ARRAY_BUFFER, LUNA_VERTEX);
-    GL.vertexAttribPointer(_position, 3, GL.FLOAT, false,0,0);
-    GL.vertexAttribPointer(_color, 3, GL.FLOAT, false,0,3*4);
+    GL.vertexAttribPointer(_position, 3, GL.FLOAT, false,4*(3+2),0) ;
+    GL.vertexAttribPointer(_uv, 2, GL.FLOAT, false,4*(3+2),3*4) ;
+
     GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, LUNA_FACES);
-    //GL.drawElements(GL.TRIANGLES, 6*2*3, GL.UNSIGNED_SHORT, 0);
-    GL.drawElements(GL.TRIANGLES,luna.numberOfElements(),GL.UNSIGNED_SHORT,0);
+    GL.drawElements(GL.TRIANGLES,luna.numberOfElements(), GL.UNSIGNED_SHORT, 0);
 
     GL.flush();
 
+    if (tierra_texture.webglTexture) {
+
+      GL.activeTexture(GL.TEXTURE0);
+
+      GL.bindTexture(GL.TEXTURE_2D, tierra_texture.webglTexture);
+      GL.uniform1i(_sampler, 0);
+    }
     GL.bindBuffer(GL.ARRAY_BUFFER, TIERRA_VERTEX);
-    GL.vertexAttribPointer(_position, 3, GL.FLOAT, false,0,0);
-    GL.vertexAttribPointer(_color, 3, GL.FLOAT, false,0,3*4);
+    GL.vertexAttribPointer(_position, 3, GL.FLOAT, false,4*(3+2),0) ;
+    GL.vertexAttribPointer(_uv, 2, GL.FLOAT, false,4*(3+2),3*4) ;
+
     GL.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, TIERRA_FACES);
-    //GL.drawElements(GL.TRIANGLES, 6*2*3, GL.UNSIGNED_SHORT, 0);
-    GL.drawElements(GL.TRIANGLES,tierra.numberOfElements(),GL.UNSIGNED_SHORT,0);
+    GL.drawElements(GL.TRIANGLES,tierra.numberOfElements(), GL.UNSIGNED_SHORT, 0);
 
     GL.flush();
+
+
     window.requestAnimationFrame(animate);
   };
   animate(0);
