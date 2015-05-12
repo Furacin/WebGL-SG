@@ -32,10 +32,11 @@ var main=function() {
     e.preventDefault();
   };
 
-  CANVAS.addEventListener("mousedown", mouseDown, false);
-  CANVAS.addEventListener("mouseup", mouseUp, false);
-  CANVAS.addEventListener("mouseout", mouseUp, false);
-  CANVAS.addEventListener("mousemove", mouseMove, false);
+  //Por ahora, vamos a eliminar la interaccion del raton
+  //CANVAS.addEventListener("mousedown", mouseDown, false);
+  //CANVAS.addEventListener("mouseup", mouseUp, false);
+  //CANVAS.addEventListener("mouseout", mouseUp, false);
+  //CANVAS.addEventListener("mousemove", mouseMove, false);
 
   /*========================= GET WEBGL CONTEXT ========================= */
   var GL;
@@ -144,6 +145,10 @@ gl_FragColor = texture2D(sampler, vUV);\n\
   var MOVEMATRIX=LIBS.get_I4();
   var VIEWMATRIX=LIBS.get_I4();
 
+  //Matriz de movimiento para la tierra y la luna
+  var MOVEMATRIX_TIERRA=LIBS.get_I4();
+  var MOVEMATRIX_LUNA=LIBS.get_I4();
+
   LIBS.translateZ(VIEWMATRIX, -6);
   var THETA=0,
       PHI=0;
@@ -185,8 +190,8 @@ gl_FragColor = texture2D(sampler, vUV);\n\
     return image;
   };
 
-  var luna_texture=get_texture("textures/luna.png");
-  var tierra_texture=get_texture("textures/earth.png");
+  var luna_texture=get_texture("ressources/luna.png");
+  var tierra_texture=get_texture("ressources/AtlantisEarth.png");
 
 
   /*========================= DRAWING ========================= */
@@ -205,13 +210,19 @@ gl_FragColor = texture2D(sampler, vUV);\n\
     LIBS.set_I4(MOVEMATRIX);
     LIBS.rotateY(MOVEMATRIX, THETA);
     LIBS.rotateX(MOVEMATRIX, PHI);
+
+    //Rotacion de la tierra
+    LIBS.rotateY(MOVEMATRIX_TIERRA,dt*0.0011);
+
+    //Rotacion de la luna
+    LIBS.rotateY(MOVEMATRIX_LUNA,dt*0.0022);
     time_old=time;
 
     GL.viewport(0.0, 0.0, CANVAS.width, CANVAS.height);
     GL.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
     GL.uniformMatrix4fv(_Pmatrix, false, PROJMATRIX);
     GL.uniformMatrix4fv(_Vmatrix, false, VIEWMATRIX);
-    GL.uniformMatrix4fv(_Mmatrix, false, MOVEMATRIX);
+    GL.uniformMatrix4fv(_Mmatrix, false, MOVEMATRIX_LUNA);
     if (luna_texture.webglTexture) {
 
       GL.activeTexture(GL.TEXTURE0);
@@ -236,6 +247,8 @@ gl_FragColor = texture2D(sampler, vUV);\n\
       GL.bindTexture(GL.TEXTURE_2D, tierra_texture.webglTexture);
       GL.uniform1i(_sampler, 0);
     }
+    //Movimiento de la tierra
+    GL.uniformMatrix4fv(_Mmatrix,false,MOVEMATRIX_TIERRA);
     GL.bindBuffer(GL.ARRAY_BUFFER, TIERRA_VERTEX);
     GL.vertexAttribPointer(_position, 3, GL.FLOAT, false,4*(3+2),0) ;
     GL.vertexAttribPointer(_uv, 2, GL.FLOAT, false,4*(3+2),3*4) ;
