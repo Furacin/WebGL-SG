@@ -10,6 +10,7 @@ var main=function() {
   var drag=false;
   var old_x, old_y;
   var dX=0, dY=0;
+  var rotateMoonActive=true;
 
   var mouseDown=function(e) {
     drag=true;
@@ -32,7 +33,13 @@ var main=function() {
     e.preventDefault();
   };
 
+  var mouseClick=function(e) {
+    rotateMoonActive=!rotateMoonActive;
+    console.log("CAMBIO DE ROTACION!");
+  }
+
   //Por ahora, vamos a eliminar la interaccion del raton
+  CANVAS.addEventListener("click",mouseClick);
   //CANVAS.addEventListener("mousedown", mouseDown, false);
   //CANVAS.addEventListener("mouseup", mouseUp, false);
   //CANVAS.addEventListener("mouseout", mouseUp, false);
@@ -215,7 +222,8 @@ gl_FragColor = texture2D(sampler, vUV);\n\
     LIBS.rotateY(MOVEMATRIX_TIERRA,dt*0.0011);
 
     //Rotacion de la luna
-    LIBS.rotateY(MOVEMATRIX_LUNA,dt*0.0022);
+    if(rotateMoonActive)
+      LIBS.rotateY(MOVEMATRIX_LUNA,dt*0.0022);
     time_old=time;
 
     GL.viewport(0.0, 0.0, CANVAS.width, CANVAS.height);
